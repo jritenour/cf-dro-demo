@@ -1,0 +1,50 @@
+---
+- hosts: localhost
+
+  tasks:
+  - name: Get services
+    uri:
+      url: "{{ manageiq.api_url }}/api/services"
+      method: GET
+      return_content: yes
+      validate_certs: no
+      body_format: json
+      headers:
+        X-Auth-Token: "{{ manageiq.api_token }}"
+        Content-Type: "application/json"
+    register: service
+
+  - name: Create DRO entry
+    uri:
+      url: "{{ manageiq.api_url }}/api/generic_objects"
+      method: POST
+      validate_certs: no
+      headers:
+        X-Auth-Token: "{{ manageiq.api_token }}"
+        Content-Type:  application/json
+      body_format: json
+      body:
+        action: create
+        name: "{{ dro_name }}"
+        generic_object_definition:
+          href: "{{ manageiq.api_url }}/api/generic_object_definitions/1"
+        property_attributes:
+          haproxy_port: "{{ haproxy_port }}"
+          host1: "{{ hostvars[groups['web'][0]]['ansible_all_ipv4_addresses'][0] }}"
+          host2: "{{ hostvars[groups['web'][1]]['ansible_all_ipv4_addresses'][0] }}"
+          lb_address: "{{ hostvars[groups['haproxy'][0]]['ansible_all_ipv4_addresses'][0] }}"
+    register: dro
+  - name: add generic object to service
+    uri:
+      url: "{{ service.json.resources|last|json_query('href') }}"
+      method: POST
+      validate_certs: no
+      headers:
+        X-Auth-Token: "{{ manageiq.api_token }}"
+        Content-Type:  application/json
+      body_format: json
+      body:
+        action: add_resource
+        resource:
+          resource:
+            href: "{{ dro.json.results[0].href }}"

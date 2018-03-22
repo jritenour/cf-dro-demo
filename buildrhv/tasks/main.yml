@@ -1,0 +1,199 @@
+---
+# tasks file for buildrhv
+ - name: Authenticate to RHV-M
+   ovirt_auth:
+     url: "https://{{ rhvm_addr }}/ovirt-engine/api"
+     username: "{{ rhv_user }}"
+     password: "{{ rhv_pass }}" 
+     insecure: true
+
+
+ - name: Set the Provider URL
+   set_fact:
+     provider_url: "{{ manageiq.api_url }}/api/providers/1"
+
+ - name: Set the Service URL
+   set_fact:
+     svc_url: "/api/{{ manageiq.service }}"
+
+ - name: create the VM
+   ovirt_vms: 
+     auth: "{{ ovirt_auth }}"
+     state: running
+     name: "{{ vm_name }}"
+     cluster: "{{ cluster }}"
+     wait: True
+     template: "{{ template_name }}"
+     nics:
+       - name: eth0
+         profile_name: "{{ network_name }}"
+   register: new_vm
+
+ - debug: var=new_vm
+
+ - set_fact: new_vm_uuid="{{ new_vm.vm.id }}"
+
+ - name: Wait for IP
+
+   pause: 
+     seconds: 30
+
+ - name: Refresh provider in CloudForms
+   uri:
+     url: "{{ provider_url }}"
+     method: POST
+     body:
+       action: refresh
+     body_format: json
+     validate_certs: False
+     headers:
+       X-Auth-Token: "{{ manageiq.api_token }}"
+       Content-Type: "application/json" 
+     status_code: 200
+   register: output
+ - debug: var=output
+ - name: set the task href
+   set_fact:
+     task_url: "{{ output.json.task_href}}"
+ - debug: var=task_url
+
+ - name: Refresh provider in CloudForms
+   uri:
+     url: "{{ provider_url }}"
+     method: POST
+     body:
+       action: refresh
+     body_format: json
+     validate_certs: False
+     headers:
+       X-Auth-Token: "{{ manageiq.api_token }}"
+       Content-Type: "application/json" 
+     status_code: 200
+   register: output
+ - debug: var=output
+ - name: set the task href
+   set_fact:
+     task_url: "{{ output.json.task_href}}"
+ - debug: var=task_url
+
+ - name: Wait for the refresh to end
+   uri:
+     url: "{{ task_url }}"
+     method: GET
+     validate_certs: False
+     headers:
+       X-Auth-Token: "{{ manageiq.api_token }}"
+       Content-Type: "application/json" 
+     status_code: 200
+   register: task_result
+   until: task_result.json.state == 'Finished' or task_result.json.status == 'Error'
+   failed_when: task_result.json.status == 'Error'
+   retries: 5
+   delay: 20
+ - debug: var=task_result
+
+ - set_fact: find_vm_url="{{ manageiq.api_url }}/api/vms?expand=resources&attributes=href,uid_ems&filter[]=uid_ems='{{ new_vm_uuid }}'"
+
+ - debug: var=find_vm_url
+
+ - name: Call to CloudForms to find href for new_vm_uuid
+   uri:
+     url: "{{ find_vm_url }}"
+     method: GET
+     validate_certs: no
+     headers:
+       X-Auth-Token: "{{ manageiq.api_token }}"
+       Content-Type: "application/json"
+     body_format: json
+     return_content: yes
+   register: token_output
+
+ - debug: var=token_output
+
+ - set_fact: cf_vm_href="{{ token_output.json.resources[0].href }}"
+
+ - debug: var=cf_vm_href
+
+ - name: Create an array of vms
+   set_fact:
+     vms: "{{ vms|default([]) + [ { 'href': svc_url, 'resource':  { 'href': item } } ] }}"
+   with_items:
+     - "{{ cf_vm_href }}"
+
+ - debug: var=vms
+
+ - name: Register vm with the service
+   uri:
+     url: "{{ manageiq.api_url }}/api/services"
+     method: POST
+     body_format: json
+     body:
+       action: add_resource
+       resources : "{{ vms }}"
+     validate_certs: False
+     headers:
+       X-Auth-Token: "{{ manageiq.api_token }}"
+       Content-Type: "application/json"
+     status_code: 200
+   register: output
+
+ - debug: var=output.json.results[0].success
+
+
+ - name: List web vms
+   ovirt_vms_facts:
+     auth: "{{ ovirt_auth }}"
+     pattern: name=web*
+   when: web
+
+ - name: Get VM API info
+   uri:
+     url: "https://{{ rhvm_addr }}{{ item.href }}/reporteddevices"
+     method: GET
+     return_content: yes
+     user: "{{ rhv_user }}"
+     password: "{{ rhv_pass }}"
+     validate_certs: no
+     body_format: raw
+     headers:
+       Accept: application/json
+   with_items: "{{ ovirt_vms }}"
+   register: vmapi
+   when: web
+
+ - name: add web server to inventory
+   add_host:
+     hostname: "{{ item.json.reported_device[0].ips.ip[0].address }}"
+     ansible_ssh_user: root
+     groupname: web
+   with_items: "{{ vmapi.results }}"
+   when: web
+
+ - name: List haproxy vms
+   ovirt_vms_facts:
+     auth: "{{ ovirt_auth }}"
+     pattern: name=haproxy
+   when: haproxy
+
+ - name: Get VM API info
+   uri:
+     url: "https://{{ rhvm_addr }}{{ item.href }}/reporteddevices"
+     method: GET
+     return_content: yes
+     user: "{{ rhv_user }}"
+     password: "{{ rhv_pass }}"
+     validate_certs: no
+     body_format: raw
+     headers:
+       Accept: application/json
+   with_items: "{{ ovirt_vms }}"
+   register: vmapi
+   when: haproxy
+
+ - name: add haproxy server to inventory
+   add_host:
+     hostname: "{{ item.json.reported_device[0].ips.ip[0].address }}"
+     ansible_ssh_user: root
+     groupname: haproxy
+   with_items: "{{ vmapi.results }}"
+   when: haproxy

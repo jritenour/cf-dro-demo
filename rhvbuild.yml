@@ -1,0 +1,38 @@
+---
+- hosts: localhost
+  connection: local
+  gather_facts: no
+  vars: 
+    vm_name: "{{ web1 }}"
+    type: web
+    web: true
+    haproxy: false
+  roles:
+    - {role: 'buildrhv'}
+
+- hosts: localhost
+  connection: local
+  gather_facts: no
+  vars: 
+    vm_name: "{{ web2 }}"
+    type: web
+    web: true
+    haproxy: false
+  roles:
+    - {role: 'buildrhv'}
+
+- import_playbook: apachetest.yml
+
+- hosts: localhost
+  connection: local
+  gather_facts: no
+  vars: 
+    vm_name: "{{ ha_vm }}"
+    type: haproxy
+    web: false
+    haproxy: true
+  roles:
+    - {role: 'buildrhv'}
+
+- import_playbook: haproxy.yml
+- import_playbook: cfgenjob.yml

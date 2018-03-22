@@ -1,0 +1,38 @@
+---
+- hosts: web
+  gather_facts: no
+  tasks:
+  - name: Wait for connection
+    wait_for_connection:
+
+  - name: Gather facts
+    setup:
+
+  - name: Install Apache
+    yum:
+      name: httpd
+      state: latest
+
+  - name: Setup basic index file
+    copy:
+      content: "<h1>This is the index of '{{ ansible_hostname }}'.</h1>"
+      dest: /var/www/html/index.html
+      owner: apache
+      group: apache
+      mode: 0644
+  - name: Allow HTTP through firewall
+    firewalld:
+      service: http
+      permanent: true
+      state: enabled
+
+  - name: restart firewall
+    service:
+      name: firewalld
+      state: restarted
+
+  - name: start and enable apache
+    service:
+      name: httpd
+      state: started
+      enabled: yes

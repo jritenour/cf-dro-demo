@@ -1,0 +1,58 @@
+---
+- hosts: localhost
+  tasks:
+  - name: Test generic objets
+    uri:
+      url: "{{ manageiq.api_url }}/api/generic_objects/{{ dro_id }}"
+      method: GET
+      return_content: yes
+      validate_certs: no
+      body_format: json
+      headers:
+        X-Auth-Token: "{{ manageiq.api_token }}"
+        Content-Type:  application/json
+    register: result
+
+  - name: debug
+    debug: 
+      var: result.json.property_attributes
+
+  - name: Test LB
+    uri:
+      url: "http://{{ result.json.property_attributes.lb_address }}"
+      method: GET
+      body_format: json
+      return_content: yes
+      status_code: 200
+    register: lb_result
+    
+  - name: Check LB results
+    debug:
+      var: lb_result.content
+
+  - name: Test host1
+    uri:
+      url: "http://{{ result.json.property_attributes.host1 }}"
+      method: GET
+      body_format: json
+      status_code: 200
+      return_content: yes
+    register: host1_result
+
+  - name: Check host1 results
+    debug:
+      var: host1_result.content
+
+  - name: Test host2
+    uri:
+      url: "http://{{ result.json.property_attributes.host2 }}"
+      method: GET
+      status_code: 200
+      body_format: json
+      return_content: yes
+    register: host2_result
+
+  - name: Check host2 results
+    debug:
+      var: host2_result.content
+

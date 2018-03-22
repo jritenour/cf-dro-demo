@@ -1,0 +1,60 @@
+---
+- hosts:  haproxy
+  gather_facts: no
+  vars: 
+    haproxy_group: haproxy
+    haproxy_user: haproxy
+    haproxy_version: 1.7
+    haproxy_port: 80
+    haproxy_global:
+      - "daemon"
+      - "maxconn 256"
+        
+    haproxy_frontend_port: 80
+    haproxy_servers_balance: roundrobin
+    haproxy_servers: 
+      - "web1 {{ hostvars[groups['web'][0]]['ansible_all_ipv4_addresses'][0] }}:80"
+      - "web2 {{ hostvars[groups['web'][1]]['ansible_all_ipv4_addresses'][0] }}:80"
+    
+  tasks:
+    - name: Wait for connection
+      wait_for_connection:
+ 
+    - name: Gather facts
+      setup:
+
+    - name: install haproxy
+      yum: 
+        name: haproxy
+        state: latest
+
+    - name: Template out haproxy cfg
+      template:
+        src: templates/haproxy.j2
+        dest: /etc/haproxy/haproxy.cfg
+        owner: haproxy
+        group: haproxy
+        mode: 0644
+
+    - name: Add lines for each server
+      lineinfile:
+        path: /etc/haproxy/haproxy.cfg
+        line: '    server {{ item }} check'
+        insertafter: EOF
+      with_items: "{{ haproxy_servers }}"
+    - name: start haproxy
+      service:
+        name: haproxy
+        state: restarted
+
+    - name: Allow HTTP through firewall
+      firewalld:
+        service: http
+        permanent: true
+        state: enabled
+
+    - name: restart firewall
+      service:
+        name: firewalld
+        state: restarted
+
