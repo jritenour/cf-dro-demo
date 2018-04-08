@@ -33,6 +33,9 @@
           host1: "{{ hostvars[groups['web'][0]]['ansible_all_ipv4_addresses'][0] }}"
           host2: "{{ hostvars[groups['web'][1]]['ansible_all_ipv4_addresses'][0] }}"
           lb_address: "{{ hostvars[groups['haproxy'][0]]['ansible_all_ipv4_addresses'][0] }}"
+        associations:
+          service:
+          - href: "{{ service.json.resources|last|json_query('href') }}"
     register: dro
   - name: add generic object to service
     uri:
