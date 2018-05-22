@@ -27,7 +27,7 @@
         action: create
         name: "{{ dro_name }}"
         generic_object_definition:
-          href: "{{ manageiq.api_url }}/api/generic_object_definitions/1"
+          href: "{{ manageiq.api_url }}/api/generic_object_definitions/10000000000001"
         property_attributes:
           haproxy_port: "{{ haproxy_port }}"
           host1: "{{ hostvars[groups['web'][0]]['ansible_all_ipv4_addresses'][0] }}"
