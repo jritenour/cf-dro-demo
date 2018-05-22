@@ -1,0 +1,22 @@
+userlist myusers
+    user testuser insecure-password testpassw
+global
+    daemon
+    maxconn 256
+    user haproxy
+    group haproxy
+
+defaults
+    mode http
+    timeout connect 5000ms
+    timeout client 50000ms
+    timeout server 50000ms
+
+frontend http-in
+    bind *:{{ haproxy_port }}
+    mode http
+    default_backend www
+backend  www
+    balance roundrobin
+    mode http
+    option forwardfor
