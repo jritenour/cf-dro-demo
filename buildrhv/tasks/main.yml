@@ -10,7 +10,7 @@
 
  - name: Set the Provider URL
    set_fact:
-     provider_url: "{{ manageiq.api_url }}/api/providers/1"
+     provider_url: "{{ manageiq.api_url }}/api/providers/10000000000001"
 
  - name: Set the Service URL
    set_fact:
