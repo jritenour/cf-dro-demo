@@ -24,9 +24,6 @@
      cluster: "{{ cluster }}"
      wait: True
      template: "{{ template_name }}"
-     nics:
-       - name: eth0
-         profile_name: "{{ network_name }}"
      cloud_init:
        host_name:  "{{ vm_name }}"
    register: new_vm
